@@ -1,0 +1,252 @@
+DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    canvas {
+      background-color: skyblue;
+      display: block;
+    }
+
+    #gameOver {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background-color: white;
+      border: 3px solid black;
+      text-align: center;
+      font-size: 24px;
+    }
+
+    #gameOver h1 {
+      color: red;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameOver">
+    <h1>Game Over</h1>
+    <p>Press Enter to Restart</p>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gameOverScreen = document.getElementById('gameOver');
+
+    // Canvas size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Player properties
+    const player = {
+      x: 100,
+      y: canvas.height - 150,
+      width: 50,
+      height: 50,
+      color: 'red',
+      hatColor: 'yellow',
+      pantColor: 'black',
+      dy: 0,
+      gravity: 0.5,
+      jumpPower: 15,
+      isJumping: false,
+      speed: 5,
+      level: 1,
+      legAnimationFrame: 0, // For alternating leg positions
+      isRunning: true
+    };
+
+    // Obstacle properties
+    const obstacles = [];
+    const obstacleWidth = 50;
+    let obstacleSpeed = 5;
+    let obstacleGap = 300;
+    let frameCount = 0;
+
+    // Game states
+    let isGameOver = false;
+    let score = 0;
+
+    // Key handling
+    let keys = {
+      ArrowUp: false,
+      Space: false
+    };
+
+    // Event listeners for key controls
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowUp' || e.code === 'Space') {
+        keys[e.code] = true;
+      }
+      if (e.code === 'Enter' && isGameOver) {
+        resetGame();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowUp' || e.code === 'Space') {
+        keys[e.code] = false;
+      }
+    });
+
+    function drawPlayer() {
+      // Draw legs with simple animation
+      if (player.isRunning && !player.isJumping) {
+        player.legAnimationFrame++;
+      }
+
+      // Alternate between two leg positions
+      if (player.legAnimationFrame % 20 < 10) {
+        // First leg position
+        ctx.fillStyle = player.pantColor;
+        ctx.fillRect(player.x, player.y + player.height - 20, player.width / 2, 20); // Left leg
+        ctx.fillRect(player.x + player.width / 2, player.y + player.height - 10, player.width / 2, 10); // Right leg bent
+      } else {
+        // Second leg position
+        ctx.fillStyle = player.pantColor;
+        ctx.fillRect(player.x + player.width / 2, player.y + player.height - 20, player.width / 2, 20); // Right leg
+        ctx.fillRect(player.x, player.y + player.height - 10, player.width / 2, 10); // Left leg bent
+      }
+
+      // Draw body (red shirt)
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height - 20);
+
+      // Draw hat (yellow)
+      ctx.fillStyle = player.hatColor;
+      ctx.fillRect(player.x + 10, player.y - 10, player.width - 20, 10);
+    }
+
+    function drawObstacle(obstacle) {
+      ctx.fillStyle = 'brown';
+      ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    }
+
+    function drawGrass() {
+      ctx.fillStyle = 'green';
+      ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    }
+
+    function jump() {
+      if (!player.isJumping) {
+        player.dy = -player.jumpPower;
+        player.isJumping = true;
+        player.isRunning = false; // Stop running animation while jumping
+      }
+    }
+
+    function updatePlayer() {
+      // Jumping logic
+      if (keys.ArrowUp || keys.Space) {
+        jump();
+      }
+
+      // Gravity and movement
+      player.y += player.dy;
+      player.dy += player.gravity;
+
+      // Stop jumping when hitting the ground
+      if (player.y + player.height >= canvas.height - 100) {
+        player.y = canvas.height - player.height - 100;
+        player.isJumping = false;
+        player.isRunning = true; // Resume running animation
+      }
+    }
+
+    function updateObstacles() {
+      frameCount++;
+      if (frameCount % obstacleGap === 0) {
+        const obstacleHeight = 50 + player.level * 5;
+        obstacles.push({
+          x: canvas.width,
+          y: canvas.height - 100 - obstacleHeight,
+          width: obstacleWidth,
+          height: obstacleHeight
+        });
+      }
+
+      for (let i = 0; i < obstacles.length; i++) {
+        const obstacle = obstacles[i];
+        obstacle.x -= obstacleSpeed;
+
+        if (obstacle.x + obstacle.width < 0) {
+          obstacles.splice(i, 1);
+          i--;
+          score++;
+          if (score % 10 === 0) {
+            player.level++;
+            obstacleSpeed += 1;
+            obstacleGap -= 10;
+            alert(`Level Up! Speed Increased!`);
+          }
+        }
+
+        if (checkCollision(player, obstacle)) {
+          isGameOver = true;
+        }
+      }
+    }
+
+    function checkCollision(player, obstacle) {
+      return (
+        player.x < obstacle.x + obstacle.width &&
+        player.x + player.width > obstacle.x &&
+        player.y < obstacle.y + obstacle.height &&
+        player.y + player.height > obstacle.y
+      );
+    }
+
+    function resetGame() {
+      isGameOver = false;
+      score = 0;
+      player.level = 1;
+      obstacleSpeed = 5;
+      obstacleGap = 300;
+      obstacles.length = 0;
+      player.legAnimationFrame = 0;
+      gameOverScreen.style.display = 'none';
+      animate();
+    }
+
+    function displayGameOver() {
+      gameOverScreen.style.display = 'block';
+    }
+
+    function animate() {
+      if (isGameOver) {
+        displayGameOver();
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw elements
+      drawGrass();
+      drawPlayer();
+      obstacles.forEach(drawObstacle);
+
+      // Update game logic
+      updatePlayer();
+      updateObstacles();
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
